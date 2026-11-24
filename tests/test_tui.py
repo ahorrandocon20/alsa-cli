@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
+from click import unstyle
 from typer.testing import CliRunner
 
 import alsa.tui.app as app_module
@@ -129,7 +130,8 @@ def test_alsa_sin_terminal_muestra_la_ayuda_y_no_abre_la_tui(monkeypatch):
     monkeypatch.setattr(app_module, "run", tui_abierta)
     result = CliRunner().invoke(cli_app, [])
     assert result.exit_code == 0
-    assert re.search(r"\bbus\b", result.output) and re.search(r"\bstations\b", result.output)
+    output = unstyle(result.output)
+    assert re.search(r"\bbus\b", output) and re.search(r"\bstations\b", output)
 
 
 # --- flujo completo con Textual -------------------------------------------------
