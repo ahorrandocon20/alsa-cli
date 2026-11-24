@@ -1,0 +1,42 @@
+name: Bug
+description: Something does not work as the README says
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happens
+    attributes:
+      label: What happens
+      description: What you saw, including the full error output.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to reproduce
+      description: The exact command or TUI steps, with origin, destination, date and adults.
+      placeholder: alsa bus Madrid Toledo --date 20/12/2026 --format json
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version and OS
+      description: Output of `uv tool list | grep alsa-cli` (or the commit you run) and your OS.
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where
+      options:
+        - CLI
+        - TUI
+        - MCP server
+    validations:
+      required: true

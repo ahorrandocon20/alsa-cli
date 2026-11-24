@@ -195,6 +195,8 @@ uvx ruff check .
 - Scripts and agents read the JSON, so add fields rather than renaming or removing them.
 - Never commit real passenger or booking data, HAR captures, tickets or tokens.
 
+To contribute, open an issue first and then a pull request that closes it: see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## License
 
 [MIT](LICENSE).
