@@ -248,6 +248,12 @@ SearchScreen.-narrow #time-row Select {
     width: auto;
     padding: 0 3;
     text-style: bold;
+    background: $surface;
+    color: $secondary;
+}
+
+#search:hover {
+    background: $panel;
 }
 
 #search:focus {

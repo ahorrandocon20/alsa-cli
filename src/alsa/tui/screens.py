@@ -37,7 +37,14 @@ from alsa.tui.purchase import (
     PurchaseScreen,
 )
 from alsa.tui.stations import StationOption
-from alsa.tui.widgets import BusScene, Chip, MonthCalendar, StationField
+from alsa.tui.widgets import (
+    BusScene,
+    Chip,
+    MonthCalendar,
+    StationField,
+    Stepper,
+    TimeSelect,
+)
 
 ANY_TIME = "any"
 TIME_OPTIONS = [("a cualquier hora", ANY_TIME)] + [
@@ -138,14 +145,14 @@ class SearchScreen(Screen):
                 with Horizontal(classes="row", id="time-row"):
                     yield Label("Hora", classes="field-label")
                     yield Label("Salir desde", classes="inline-label")
-                    yield Select(TIME_OPTIONS, value=ANY_TIME, allow_blank=False, compact=True, id="depart-after")
+                    yield TimeSelect(TIME_OPTIONS, value=ANY_TIME, allow_blank=False, compact=True, id="depart-after")
                     yield Label("Llegar antes", classes="inline-label")
-                    yield Select(TIME_OPTIONS, value=ANY_TIME, allow_blank=False, compact=True, id="arrive-before")
+                    yield TimeSelect(TIME_OPTIONS, value=ANY_TIME, allow_blank=False, compact=True, id="arrive-before")
                 with Horizontal(classes="row", id="pax-row"):
                     yield Label("Viajeros", classes="field-label")
-                    yield Button("−", id="pax-minus", compact=True, classes="stepper")
+                    yield Stepper("−", id="pax-minus")
                     yield Static(fmt.travellers(self.adults), id="pax-count")
-                    yield Button("+", id="pax-plus", compact=True, classes="stepper")
+                    yield Stepper("+", id="pax-plus")
                 with Horizontal(classes="row", id="submit-row"):
                     yield Label("", classes="field-label")
                     yield Button("Buscar autobuses", id="search", variant="primary", compact=True)
@@ -230,10 +237,10 @@ class SearchScreen(Screen):
         today = date.today()
         if button_id == "day-today":
             self._set_day(today)
-            self.query_one("#search", Button).focus()
+            self.query_one("#depart-after").focus()
         elif button_id == "day-tomorrow":
             self._set_day(today + timedelta(days=1))
-            self.query_one("#search", Button).focus()
+            self.query_one("#depart-after").focus()
         elif button_id == "day-other":
             self.app.push_screen(CalendarScreen(self.day), self._calendar_closed)
         elif button_id == "pax-minus":
@@ -252,7 +259,7 @@ class SearchScreen(Screen):
     def _calendar_closed(self, day: date | None) -> None:
         if day is not None:
             self._set_day(day)
-            self.query_one("#search", Button).focus()
+            self.query_one("#depart-after").focus()
         else:
             self.query_one("#day-other", Chip).focus()
 
