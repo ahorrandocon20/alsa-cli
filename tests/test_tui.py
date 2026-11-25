@@ -173,7 +173,7 @@ async def test_flujo_completo_hasta_datos_del_viajero_en_chrome(fake_alsa):
         await _wait_for(pilot, lambda: app.stations is not None)
         await pilot.press(*"mad", "enter", *"ovi", "enter")
         await pilot.press("enter")  # «Hoy» → foco en «Salir desde»
-        await pilot.press("right", "right", "right", "enter")  # «Llegar antes», «+», Buscar
+        await pilot.press("tab", "tab", "tab", "enter")  # «Llegar antes», «+», Buscar
         await _wait_for(pilot, lambda: isinstance(app.screen, ResultsScreen) and app.screen.phase == "list")
         results = app.screen
         assert results.req.origin.id == "90155"
@@ -207,19 +207,25 @@ async def test_flechas_recorren_hora_y_viajeros_tras_elegir_el_dia(fake_alsa):
             return app.focused.id if app.focused else None
 
         assert focused() == "depart-after"
+        await pilot.press("left")
+        assert focused() == "depart-after"  # las flechas no salen de la fila
         await pilot.press("right")
         assert focused() == "arrive-before"
-        await pilot.press("left")
-        assert focused() == "depart-after"
-        await pilot.press("right", "right")
+        await pilot.press("right")
+        assert focused() == "arrive-before"
+        await pilot.press("tab")
         assert focused() == "pax-plus"  # «−» desactivado con 1 viajero
+        await pilot.press("left")
+        assert focused() == "pax-plus"
         await pilot.press("enter")
         await pilot.pause(0.3)
         assert app.screen.adults == 2
         await pilot.press("left")
         assert focused() == "pax-minus"
+        await pilot.press("left")
+        assert focused() == "pax-minus"
         await pilot.press("right", "right")
-        assert focused() == "search"
+        assert focused() == "pax-plus"
 
 
 async def test_viajeros_llegan_hasta_20_como_en_alsa(fake_alsa):
