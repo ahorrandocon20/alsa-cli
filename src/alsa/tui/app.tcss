@@ -466,6 +466,11 @@ HelpScreen.-short .dialog {
     padding: 0 3;
 }
 
+HelpScreen.-short .dialog-title,
+HelpScreen.-short #help-cols {
+    margin-bottom: 0;
+}
+
 .dialog-title {
     text-style: bold;
     color: $secondary;

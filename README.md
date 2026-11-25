@@ -120,8 +120,8 @@ or a response the CLI can't read.
    city). `ctrl+x` swaps them.
 2. Pick the day (Hoy, Mañana or the calendar), the time window and the travellers (1 to 20, like alsa.es).
 3. In the results: `o` sorts by time, price or duration; `a` / `s` move to the previous / next day; `t`
-   removes the time filter; `p` hides sold-out buses (they're greyed out and can't be bought). `?` (F1 in the form) shows
-   the help and `ctrl+q` quits.
+   turns the time filter off and on (if you set a time); `p` hides sold-out buses, if any (they're greyed
+   out and can't be bought). Anywhere, `?` shows the help and `ctrl+q` quits.
 4. Enter on a bus shows its real fares on alsa.es (Básica, Flexible, Superflexible) with their price.
 5. When you pick a fare, the TUI opens Chrome with its own profile (`~/.cache/alsa-cli/chrome`), runs the
    search, picks that bus and that fare and leaves the page at the passenger details step: you fill them

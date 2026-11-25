@@ -112,6 +112,12 @@ class Suggestions(OptionList, can_focus=False):
     """Desplegable de estaciones; el foco se queda en el Input."""
 
 
+class _StationInput(Input):
+    def check_consume_key(self, key: str, character: str | None) -> bool:
+        # ? no se escribe: abre la ayuda, como en el resto de la TUI
+        return character != "?" and super().check_consume_key(key, character)
+
+
 class StationField(Vertical):
     """Input con sugerencias de estaciones de Alsa mientras escribes."""
 
@@ -133,7 +139,7 @@ class StationField(Vertical):
         self._options: list[StationOption] = []
 
     def compose(self) -> ComposeResult:
-        yield Input(placeholder="ciudad o parada", compact=True)
+        yield _StationInput(placeholder="ciudad o parada", compact=True)
         yield Suggestions()
 
     @property
@@ -269,7 +275,7 @@ class MonthCalendar(Widget, can_focus=True):
         Binding("down", "move(7)", show=False),
         Binding("pageup", "month(-1)", "mes anterior"),
         Binding("pagedown", "month(1)", "mes siguiente"),
-        Binding("home", "today", "hoy", show=False),
+        Binding("home", "today", "hoy", key_display="Inicio"),
         Binding("enter", "pick", "elegir"),
     ]
 

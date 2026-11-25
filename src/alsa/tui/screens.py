@@ -102,7 +102,8 @@ class SearchScreen(Screen):
 
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("ctrl+x", "swap", "intercambiar"),
-        Binding("f1", "app.help", "ayuda", key_display="fn+F1"),
+        Binding("question_mark", "app.help", "ayuda", key_display="?", priority=True),
+        Binding("f1", "app.help", show=False),
     ]
 
     def __init__(self) -> None:
@@ -713,15 +714,18 @@ HELP = {
         ("Escribe y ↑ ↓", "elige parada de la lista"),
         ("Enter / Tab", "acepta la parada y sigue"),
         ("ctrl+x", "intercambia origen y destino"),
+        ("esc", "cierra la lista de paradas"),
         ("← →", "Hoy, Mañana u Otro día"),
+        ("Tab / Enter", "hora y viajeros (− +)"),
     ],
     "Resultados": [
         ("↑ ↓", "recorre los autobuses"),
-        ("Enter", "elige tarifa y paga"),
+        ("Enter", "elige tarifa y abre la compra"),
         ("o", "ordena: hora, precio, duración"),
         ("a / s", "día anterior / siguiente"),
-        ("t", "quita o pone el filtro de hora"),
-        ("p", "oculta o muestra los agotados"),
+        ("t", "filtro de hora (si lo pusiste)"),
+        ("p", "oculta agotados (si los hay)"),
+        ("r", "vuelve a buscar"),
         ("esc", "vuelve a la búsqueda"),
     ],
 }
@@ -739,7 +743,7 @@ def _help_section(title: str) -> Text:
 
 class HelpScreen(ModalScreen[None]):
     HORIZONTAL_BREAKPOINTS: ClassVar[list[tuple[int, str]]] = [(0, "-narrow"), (110, "-wide")]
-    VERTICAL_BREAKPOINTS: ClassVar[list[tuple[int, str]]] = [(0, "-short"), (28, "-tall")]
+    VERTICAL_BREAKPOINTS: ClassVar[list[tuple[int, str]]] = [(0, "-short"), (33, "-tall")]
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("escape", "close", "cerrar"),
         Binding("f1", "close", show=False),

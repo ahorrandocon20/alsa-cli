@@ -15,7 +15,7 @@ from alsa.exceptions import AlsaBlockedError
 from alsa.models import Fare, Journey, Package
 from alsa.tui import fmt, purchase, screens
 from alsa.tui.purchase import BuyScreen, PurchaseScreen
-from alsa.tui.screens import ResultsScreen, SearchRequest, matches_time
+from alsa.tui.screens import HelpScreen, ResultsScreen, SearchRequest, matches_time
 from alsa.tui.stations import StationIndex, StationOption
 
 TZ = ZoneInfo("Europe/Madrid")
@@ -219,6 +219,15 @@ async def test_ordenar_por_precio_mantiene_el_bus_seleccionado(fake_alsa):
         results = app.screen
         assert [j.cheapest_price for j in results.shown] == [34.0, 42.15, 44.5]
         assert results._current().departure.strftime("%H:%M") == "21:30"
+
+
+async def test_interrogacion_abre_la_ayuda_aunque_el_foco_este_en_un_campo(fake_alsa):
+    app = app_module.AlsaApp()
+    async with app.run_test(size=(110, 40)) as pilot:
+        await pilot.press("M", "a", "d", "question_mark")
+        assert isinstance(app.screen, HelpScreen)
+        await pilot.press("question_mark")
+        assert app.screen.query_one("#origin").input.value == "Mad"
 
 
 async def test_buscar_sin_paradas_avisa_en_el_formulario(fake_alsa):
