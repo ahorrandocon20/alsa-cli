@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import date, datetime
 
 WEEKDAYS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
@@ -48,3 +49,41 @@ def transfers(count: int) -> str:
 
 def travellers(count: int) -> str:
     return f"{count} viajero" + ("s" if count > 1 else "")
+
+
+def delay(minutes: int) -> str:
+    """Retraso estimado. Adelantado cuenta como «a su hora»: el autocar espera en cada parada."""
+    if minutes <= 2:
+        return "a su hora"
+    if minutes < 60:
+        return f"{minutes} min tarde"
+    return f"{duration(minutes)} tarde"
+
+
+def delay_style(minutes: int) -> str:
+    if minutes <= 2:
+        return "bold #4ade80"
+    return "bold #fbbf24" if minutes < 15 else "bold #f87171"
+
+
+def km(value: float) -> str:
+    return f"{value:.1f} km".replace(".", ",")
+
+
+_SMALL_WORDS = {"de", "del", "la", "las", "los", "el", "y", "a"}
+
+
+def place(name: str) -> str:
+    """«MADRID ESTACION SUR» → «Madrid Estacion Sur»; los nombres ya escritos se dejan igual."""
+    if not name.isupper():
+        return name
+
+    def word(match: re.Match[str]) -> str:
+        text = match.group(0)
+        if match.start() and text in _SMALL_WORDS:
+            return text
+        if name[match.start() - 1 : match.start()] == "(" and len(text) == 2:  # provincia: (VA)
+            return text.upper()
+        return text.capitalize()
+
+    return re.sub(r"[^\W\d_]+", word, name.lower())

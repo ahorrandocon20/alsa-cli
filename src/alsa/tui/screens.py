@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, replace
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import ClassVar
 
 from rich.text import Text
@@ -24,9 +24,10 @@ from textual.widgets import (
 )
 from textual.worker import Worker, WorkerState
 
-from alsa.core import MAX_ADULTS, search_bus
+from alsa.core import MADRID_TZ, MAX_ADULTS, search_bus
 from alsa.exceptions import AlsaError
 from alsa.models import Journey
+from alsa.tracking import CHECK_AFTER, CHECK_BEFORE
 from alsa.tui import fmt
 from alsa.tui.art import title_text
 from alsa.tui.purchase import (
@@ -37,6 +38,7 @@ from alsa.tui.purchase import (
     PurchaseScreen,
 )
 from alsa.tui.stations import StationOption
+from alsa.tui.tracking import LiveRouteScreen, TrackingScreen, TrackTarget
 from alsa.tui.widgets import (
     BusScene,
     Chip,
@@ -109,6 +111,7 @@ class SearchScreen(Screen):
 
     BINDINGS: ClassVar[list[BindingType]] = [
         Binding("ctrl+x", "swap", "intercambiar"),
+        Binding("ctrl+l", "locate", "localizar autobús", priority=True),
         Binding("question_mark", "app.help", "ayuda", key_display="?", priority=True),
         Binding("f1", "app.help", show=False),
     ]
@@ -156,6 +159,7 @@ class SearchScreen(Screen):
                 with Horizontal(classes="row", id="submit-row"):
                     yield Label("", classes="field-label")
                     yield Button("Buscar autobuses", id="search", variant="primary", compact=True)
+                    yield Button("Localizar autobús", id="locate", compact=True, classes="link", tooltip="Dónde van hoy los autobuses de esta ruta (ctrl+l)")
                     yield Static("", id="form-error")
             with Center(id="links"), Horizontal(id="links-row"):
                 yield Button("Ayuda", id="help", compact=True, classes="link")
@@ -251,6 +255,8 @@ class SearchScreen(Screen):
             self.action_swap()
         elif button_id == "search":
             self.submit()
+        elif button_id == "locate":
+            self.action_locate()
         elif button_id == "help":
             self.run_action("app.help")
         elif button_id == "credits":
@@ -274,38 +280,56 @@ class SearchScreen(Screen):
     def _clear_error(self) -> None:
         self.query_one("#form-error", Static).update("")
 
-    def submit(self) -> None:
+    def _picked_route(self) -> tuple[StationOption, StationOption] | None:
+        """Salida y llegada elegidas, o None tras avisar en el formulario de lo que falta."""
         origin = self.query_one("#origin", StationField)
         destination = self.query_one("#destination", StationField)
         if origin.station is None:
             self._show_error("Elige la parada de salida", origin)
-            return
+            return None
         if destination.station is None:
             self._show_error("Elige la parada de llegada", destination)
-            return
+            return None
         if origin.station.id == destination.station.id:
             self._show_error("La salida y la llegada son la misma parada", destination)
-            return
-        if self.day < date.today():
-            self._set_day(date.today())
-        depart = self.query_one("#depart-after", Select).value
-        arrive = self.query_one("#arrive-before", Select).value
-        req = SearchRequest(
-            origin=origin.station,
-            destination=destination.station,
-            day=self.day,
-            adults=self.adults,
-            depart_after=None if depart == ANY_TIME else str(depart),
-            arrive_before=None if arrive == ANY_TIME else str(arrive),
-        )
+            return None
+        return origin.station, destination.station
+
+    def _leave(self, screen: Screen) -> None:
+        """El autocar sale de la escena (si hay sitio para verlo) y se abre `screen`."""
         self._clear_error()
         if self._bus_away:
             return
         self._bus_away = True
         if self.has_class("-tall"):
-            self.query_one(BusScene).depart(lambda: self.app.push_screen(ResultsScreen(req)))
+            self.query_one(BusScene).depart(lambda: self.app.push_screen(screen))
         else:
-            self.app.push_screen(ResultsScreen(req))
+            self.app.push_screen(screen)
+
+    def action_locate(self) -> None:
+        """Autobuses de hoy en la ruta elegida, con dónde van; el día del formulario no cuenta."""
+        route = self._picked_route()
+        if route is not None:
+            self._leave(LiveRouteScreen(*route))
+
+    def submit(self) -> None:
+        route = self._picked_route()
+        if route is None:
+            return
+        origin_station, destination_station = route
+        if self.day < date.today():
+            self._set_day(date.today())
+        depart = self.query_one("#depart-after", Select).value
+        arrive = self.query_one("#arrive-before", Select).value
+        req = SearchRequest(
+            origin=origin_station,
+            destination=destination_station,
+            day=self.day,
+            adults=self.adults,
+            depart_after=None if depart == ANY_TIME else str(depart),
+            arrive_before=None if arrive == ANY_TIME else str(arrive),
+        )
+        self._leave(ResultsScreen(req))
 
 
 class CalendarScreen(ModalScreen[date | None]):
@@ -364,6 +388,7 @@ class ResultsScreen(Screen):
         Binding("s", "shift_day(1)", "día siguiente"),
         Binding("t", "toggle_filter", "filtro de hora"),
         Binding("p", "toggle_sold_out", "agotados"),
+        Binding("l", "track", "dónde va"),
         Binding("r", "reload", "actualizar", show=False),
         Binding("question_mark", "app.help", "ayuda", key_display="?"),
         Binding("f1", "app.help", show=False),
@@ -629,14 +654,31 @@ class ResultsScreen(Screen):
             if self.req.adults > 1:
                 text.append(f"  ({fmt.price(j.cheapest_price / self.req.adults)} por viajero)", "dim")
             text.append("   Enter para elegir tarifa y pagar", "dim")
+        if self._trackable(j):
+            text.append("\n")
+            if j.departure > datetime.now(MADRID_TZ):
+                text.append("Sale pronto: ", "bold #40c8ec")
+                text.append("l para ver por dónde viene y si llega tarde", "dim")
+            else:
+                text.append("En ruta ahora: ", "bold #40c8ec")
+                text.append("l para ver dónde va y si lleva retraso", "dim")
         self.query_one("#detail-text", Static).update(text)
         self.query_one("#buy", Button).disabled = not j.available
+
+    def _trackable(self, j: Journey) -> bool:
+        """Sale en las próximas 3 horas o va en ruta: su autocar puede estar ya de camino."""
+        if self.req.day != date.today():
+            return False
+        now = datetime.now(MADRID_TZ)
+        return j.departure - CHECK_BEFORE <= now <= j.arrival + CHECK_AFTER
 
     # --- acciones -------------------------------------------------------------
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
         if action in ("buy", "sort"):
             return self.phase == "list"
+        if action == "track":
+            return self.phase == "list" and self.req.day == date.today()
         if action == "toggle_sold_out":
             return self.phase != "loading" and any(not j.available for j in self.journeys)
         if action == "toggle_filter":
@@ -671,6 +713,11 @@ class ResultsScreen(Screen):
                 finished(choice)
 
         self.app.push_screen(BuyScreen(journey, self.req), chosen)
+
+    def action_track(self) -> None:
+        journey = self._current()
+        if journey is not None and self.req.day == date.today():
+            self.app.push_screen(TrackingScreen(TrackTarget.from_journey(journey, self.req)))
 
     def _purchase_closed(self, result: str | None) -> None:
         if result == "new":
@@ -721,6 +768,7 @@ HELP = {
         ("Escribe y ↑ ↓", "elige parada de la lista"),
         ("Enter / Tab", "acepta la parada y sigue"),
         ("ctrl+x", "intercambia origen y destino"),
+        ("ctrl+l", "localiza los autobuses de hoy"),
         ("esc", "cierra la lista de paradas"),
         ("← →", "Hoy, Mañana u Otro día"),
         ("Tab / Enter", "hora y viajeros (− +)"),
@@ -732,6 +780,7 @@ HELP = {
         ("a / s", "día anterior / siguiente"),
         ("t", "filtro de hora (si lo pusiste)"),
         ("p", "oculta agotados (si los hay)"),
+        ("l", "dónde va el autobús (hoy)"),
         ("r", "vuelve a buscar"),
         ("esc", "vuelve a la búsqueda"),
     ],

@@ -585,3 +585,27 @@ BuyScreen.-short .dialog {
 BuyScreen.-short #buy-summary {
     padding: 0 1;
 }
+
+/* --- seguimiento ---------------------------------------------------------- */
+
+#tracking-box {
+    width: 88;
+}
+
+#tracking-summary {
+    background: $panel;
+    padding: 1 2;
+    margin-bottom: 1;
+}
+
+#tracking-strip {
+    margin-bottom: 1;
+}
+
+TrackingScreen.-short #tracking-summary {
+    padding: 0 1;
+}
+
+TrackingScreen.-short #tracking-strip {
+    display: none;
+}

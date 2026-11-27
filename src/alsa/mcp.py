@@ -1,6 +1,7 @@
 """Servidor MCP: expone alsa-cli a asistentes sin terminal.
 
-Una herramienta sobre alsa.core.search_bus — el mismo núcleo que el CLI.
+Dos herramientas, con el mismo núcleo que el CLI: `search_bus` (alsa.core.search_bus)
+y `track_bus` (alsa.tracking.track_route).
 """
 
 from __future__ import annotations
@@ -15,9 +16,18 @@ except ImportError:  # instalado sin el extra mcp
         '  uv tool install --force "alsa-cli[mcp] @ git+https://github.com/ahorrandocon20/alsa-cli"'
     )
 
-from alsa.cli import _check_adults, _check_date
-from alsa.core import get_station_id
+from datetime import datetime
+
+from alsa.cli import (
+    _check_adults,
+    _check_date,
+    _check_time,
+    _missing_departure,
+    tracking_payload,
+)
+from alsa.core import MADRID_TZ, get_station_id
 from alsa.core import search_bus as _search_bus_core
+from alsa.tracking import track_route
 
 mcp = FastMCP("alsa-cli")
 
@@ -66,6 +76,40 @@ def search_bus(
         },
         "retries": retries,
     }
+
+
+@mcp.tool
+def track_bus(
+    origin: str,
+    destination: str,
+    departure_time: str | None = None,
+) -> dict:
+    """Dónde van hoy los autobuses de Alsa entre dos estaciones y cuánto retraso llevan.
+
+    Usa la página «Localiza tu bus» de alsa.es: solo hay datos de hoy y de los autobuses
+    que tienen seguimiento. Sin `departure_time` consulta los que van en ruta o salen en
+    las próximas 3 horas; el resto vuelve con status "not_checked".
+
+    Args:
+        origin: nombre o ID de la estación de salida (p. ej. "Madrid" o "90155").
+        destination: nombre o ID de la estación de llegada.
+        departure_time: hora de salida del autobús, HH:MM, para consultar solo ese.
+
+    Returns:
+        El mismo JSON que `alsa track --format json`: por cada tramo, status (waiting,
+        approaching, on_the_way, arrived, no_tracking…), delay_minutes, horas estimadas,
+        posición GPS con enlace al mapa y paradas del recorrido. El retraso es una
+        estimación con el GPS y el horario; si es negativo, el autocar espera en la parada.
+    """
+    if error := _check_time(departure_time):
+        raise ValueError(error)
+    now = datetime.now(MADRID_TZ)
+    origin_id = origin if origin.isdigit() else get_station_id(origin)
+    destination_id = destination if destination.isdigit() else get_station_id(destination)
+    trackings, retries = track_route(origin_id, destination_id, departure_time, now=now)
+    if error := _missing_departure(departure_time, trackings, origin, destination):
+        raise ValueError(error)
+    return tracking_payload(origin, destination, now, trackings, retries)
 
 
 def main() -> None:
