@@ -33,6 +33,7 @@ from alsa.exceptions import (
     AlsaBlockedError,
     AlsaConnectionError,
     AlsaParseError,
+    AlsaStationError,
     AlsaTimeoutError,
 )
 from alsa.models import Fare, Journey, Package
@@ -298,39 +299,53 @@ def _parse_journeys(data: dict) -> list[Journey]:
     return journeys
 
 
-def get_stations(query: str = "") -> list[dict]:
-    """Busca estaciones de Alsa por nombre (filtrado local, como su web)."""
+STATIONS_URL = (
+    f"{BASE_URL}/home"
+    f"?p_p_id=com_babel_alsa_espania_journeysearch_web_JourneySearchPortlet_INSTANCE_21651890"
+    f"&p_p_lifecycle=2&p_p_state=normal&p_p_mode=view"
+    f"&p_p_resource_id=GetOriginsResourceCommand"
+    f"&p_p_cacheability=cacheLevelPage"
+)
+
+
+def _norm(text: str) -> str:
+    """Minúsculas y sin acentos, para comparar nombres de paradas."""
+    decomposed = unicodedata.normalize("NFD", text.casefold())
+    return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+
+
+def _fetch_station_list() -> list[dict]:
+    """Descarga la lista completa de paradas de alsa.es, tal cual la devuelve la web.
+
+    Es una sola petición, sin reintentos. Un bloqueo, un timeout o una conexión caída
+    dan el mismo error que en la búsqueda, nunca una lista vacía.
+    """
     session = curl_requests.Session()
     session.impersonate = "chrome"
-
-    origins_url = (
-        f"{BASE_URL}/home"
-        f"?p_p_id=com_babel_alsa_espania_journeysearch_web_JourneySearchPortlet_INSTANCE_21651890"
-        f"&p_p_lifecycle=2&p_p_state=normal&p_p_mode=view"
-        f"&p_p_resource_id=GetOriginsResourceCommand"
-        f"&p_p_cacheability=cacheLevelPage"
-    )
-
     try:
-        resp = session.post(origins_url, data={"origen": query}, timeout=REQUEST_TIMEOUT)
-    except Exception as e:
+        resp = session.post(STATIONS_URL, data={"origen": ""}, timeout=REQUEST_TIMEOUT)
+    except Timeout as e:
+        raise AlsaTimeoutError(REQUEST_TIMEOUT) from e
+    except RequestException as e:
         raise AlsaConnectionError(str(e)) from e
 
-    if resp.status_code in (403, 429):
+    if resp.status_code in (403, 429) or IMPERVA_BLOCK_MARK in resp.text:
         raise AlsaBlockedError()
 
     try:
-        all_stations = json.loads(resp.text)
+        stations = json.loads(resp.text)
     except json.JSONDecodeError:
-        return []
+        raise AlsaParseError("la lista de estaciones no se pudo leer") from None
+    if not isinstance(stations, list):
+        raise AlsaParseError("la lista de estaciones no se pudo leer")
+    return stations
 
-    def _norm(text: str) -> str:
-        decomposed = unicodedata.normalize("NFD", text.casefold())
-        return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
 
+def get_stations(query: str = "") -> list[dict]:
+    """Busca estaciones de Alsa por nombre (filtrado local, como su web)."""
     query_norm = _norm(query)
     result = []
-    for st in all_stations:
+    for st in _fetch_station_list():
         if query_norm and query_norm not in _norm(st.get("name", "")):
             continue
         result.append(
@@ -350,30 +365,6 @@ def get_stations(query: str = "") -> list[dict]:
 
 def get_all_stations() -> list[dict]:
     """Descarga la lista completa de estaciones de Alsa, sin filtrar ni recortar."""
-    session = curl_requests.Session()
-    session.impersonate = "chrome"
-
-    origins_url = (
-        f"{BASE_URL}/home"
-        f"?p_p_id=com_babel_alsa_espania_journeysearch_web_JourneySearchPortlet_INSTANCE_21651890"
-        f"&p_p_lifecycle=2&p_p_state=normal&p_p_mode=view"
-        f"&p_p_resource_id=GetOriginsResourceCommand"
-        f"&p_p_cacheability=cacheLevelPage"
-    )
-
-    try:
-        resp = session.post(origins_url, data={"origen": ""}, timeout=REQUEST_TIMEOUT)
-    except Exception as e:
-        raise AlsaConnectionError(str(e)) from e
-
-    if resp.status_code in (403, 429):
-        raise AlsaBlockedError()
-
-    try:
-        all_stations = json.loads(resp.text)
-    except json.JSONDecodeError:
-        raise AlsaParseError("la lista de estaciones no se pudo leer") from None
-
     return [
         {
             "id": str(st.get("id", "")),
@@ -381,7 +372,7 @@ def get_all_stations() -> list[dict]:
             "province": st.get("provincecountryName", ""),
             "icon": st.get("icon", ""),
         }
-        for st in all_stations
+        for st in _fetch_station_list()
         if st.get("id") and st.get("name")
     ]
 
@@ -392,33 +383,7 @@ def get_station_id(name: str) -> str:
     Descarga la lista completa (una petición) y filtra localmente.
     Prioriza match exacto, luego agrupación de ciudad, luego startsWith.
     """
-    session = curl_requests.Session()
-    session.impersonate = "chrome"
-
-    origins_url = (
-        f"{BASE_URL}/home"
-        f"?p_p_id=com_babel_alsa_espania_journeysearch_web_JourneySearchPortlet_INSTANCE_21651890"
-        f"&p_p_lifecycle=2&p_p_state=normal&p_p_mode=view"
-        f"&p_p_resource_id=GetOriginsResourceCommand"
-        f"&p_p_cacheability=cacheLevelPage"
-    )
-
-    try:
-        resp = session.post(origins_url, data={"origen": ""}, timeout=REQUEST_TIMEOUT)
-    except Exception as e:
-        raise AlsaConnectionError(str(e)) from e
-
-    if resp.status_code in (403, 429):
-        raise AlsaBlockedError()
-
-    try:
-        all_stations = json.loads(resp.text)
-    except json.JSONDecodeError:
-        raise AlsaParseError("la lista de estaciones no se pudo leer") from None
-
-    def _norm(text: str) -> str:
-        decomposed = unicodedata.normalize("NFD", text.casefold())
-        return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+    all_stations = _fetch_station_list()
 
     name_norm = _norm(name)
 
@@ -430,7 +395,7 @@ def get_station_id(name: str) -> str:
     # 2: agrupación "(Todas las paradas)" que contenga el nombre
     for st in all_stations:
         st_name = _norm(st.get("name", ""))
-        if "todas las paradas" in st_name.lower() and name_norm in st_name:
+        if "todas las paradas" in st_name and name_norm in st_name:
             return st["id"]
 
     # 3: el nombre EMPIEZA por la búsqueda
@@ -442,8 +407,6 @@ def get_station_id(name: str) -> str:
     for st in all_stations:
         if name_norm in _norm(st.get("name", "")):
             return st["id"]
-
-    from alsa.exceptions import AlsaStationError
 
     raise AlsaStationError(
         f"No se encontró ninguna estación que encaje con {name!r}. "

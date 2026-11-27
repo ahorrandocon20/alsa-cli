@@ -331,6 +331,21 @@ async def test_agotados_en_gris_no_se_compran_ni_cuentan_como_mas_baratos(fake_a
         assert SOLD_OUT not in results.shown
 
 
+async def test_bus_sin_precio_no_muestra_infinito_ni_es_el_mas_barato(fake_alsa, monkeypatch):
+    no_price = Journey(**{**JOURNEYS[0].__dict__, "fares": []})
+    monkeypatch.setattr(screens, "search_bus", lambda *a: ([no_price, JOURNEYS[1]], [], "https://alsa.test"))
+    app = app_module.AlsaApp()
+    async with app.run_test(size=(110, 40)) as pilot:
+        app.push_screen(ResultsScreen(_req()))
+        await _wait_for(pilot, lambda: isinstance(app.screen, ResultsScreen) and app.screen.phase == "list")
+        results = app.screen
+        assert "desde 34,00" in str(results.query_one("#summary").render())
+        table = results.query_one("#table")
+        assert [str(c) for c in table.get_row_at(0)][-1] == "sin precio"
+        assert [str(c) for c in table.get_row_at(1)][-1] == "34,00 € ★"
+        assert "inf" not in str(results.query_one("#detail-text").render())
+
+
 def test_enlace_de_resultados_lanza_la_busqueda_sin_token():
     from alsa.core import results_url
 

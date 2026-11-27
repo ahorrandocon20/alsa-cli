@@ -138,7 +138,7 @@ def _print_text(
         return
 
     for i, j in enumerate(journeys, start=1):
-        price_text = f"{j.cheapest_price:.2f} €"
+        price_text = f"{j.cheapest_price:.2f} €" if j.fares else "sin precio"
         title = Text(f"{i} · {price_text}", "bold")
         service = j.service_type or "bus"
         title.append(f" · {service}", "dim")

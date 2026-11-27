@@ -86,6 +86,15 @@ def test_bus_texto_por_defecto(fake_search):
     assert "00:30 → 06:15" in result.stdout and "comprar: https://alsa.test/shop" in result.stdout
 
 
+def test_bus_texto_sin_precio_no_muestra_infinito(fake_search, monkeypatch):
+    no_price = Journey(**{**JOURNEY.__dict__, "fares": []})
+    monkeypatch.setattr(cli, "search_bus", lambda *args: ([no_price], [], "https://alsa.test/shop"))
+    result = _run("bus", "Madrid", "Oviedo", "-d", DAY)
+
+    assert result.exit_code == 0
+    assert "sin precio" in result.stdout and "inf" not in result.stdout
+
+
 @pytest.mark.parametrize(
     ("args", "message"),
     [

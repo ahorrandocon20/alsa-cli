@@ -521,10 +521,11 @@ class ResultsScreen(Screen):
         sold_out = shown - len(available)
         if sold_out:
             summary.append(f"  ·  {sold_out} agotado" + ("s" if sold_out > 1 else ""), "#8b95a7")
-        if available:
+        priced = [j for j in available if j.fares]
+        if priced:
             summary.append("  ·  desde ")
-            summary.append(fmt.price(min(j.cheapest_price for j in available)), "bold #4ade80")
-        else:
+            summary.append(fmt.price(min(j.cheapest_price for j in priced)), "bold #4ade80")
+        elif not available:
             summary.append("  ·  sin plazas: prueba otro día", "bold #fbbf24")
         summary.append(f"  ·  por {SORTS[self.sort_index][0]}", "dim")
         self.query_one("#summary", Static).update(summary)
@@ -545,16 +546,21 @@ class ResultsScreen(Screen):
             table.add_column("Trayecto", key="hops")
         table.add_column(price_label, key="price")
         available = [j for j in self.shown if j.available] or self.shown
-        cheapest = min(j.cheapest_price for j in available)
+        # Sin tarifas, cheapest_price es infinito: ni se muestra ni cuenta como el más barato.
+        cheapest = min((j.cheapest_price for j in available if j.fares), default=None)
         fastest = min(j.duration_minutes for j in available)
         for i, j in enumerate(self.shown):
             if not j.available:
                 table.add_row(*self._sold_out_cells(j, compact), key=str(i))
                 continue
             supra = "supra" in j.service_type.lower()
-            price_text = Text(fmt.price(j.cheapest_price), style="bold #4ade80" if j.cheapest_price == cheapest else "")
-            if j.cheapest_price == cheapest:
+            if not j.fares:
+                price_text = Text("sin precio", style="italic dim")
+            elif j.cheapest_price == cheapest:
+                price_text = Text(fmt.price(j.cheapest_price), style="bold #4ade80")
                 price_text.append(" ★", style="#4ade80")
+            else:
+                price_text = Text(fmt.price(j.cheapest_price))
             duration = Text(fmt.duration(j.duration_minutes), style="#40c8ec" if j.duration_minutes == fastest else "")
             if compact and j.transfers:
                 duration.append(" ⇄", style="#fbbf24")
@@ -623,6 +629,9 @@ class ResultsScreen(Screen):
         if not j.available:
             text.append("Agotado: ", "bold #fbbf24")
             text.append("Alsa no tiene plazas en este autobús. Elige otro o prueba otro día con a / s.", "dim")
+        elif not j.fares:
+            text.append("Sin precio: ", "bold #fbbf24")
+            text.append("Alsa no lo muestra en la lista. Enter para mirarlo en alsa.es", "dim")
         else:
             text.append("Desde ", "dim")
             text.append(fmt.price(j.cheapest_price), "bold #4ade80")

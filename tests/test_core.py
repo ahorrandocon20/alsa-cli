@@ -13,8 +13,10 @@ from alsa import core
 from alsa.core import (
     _parse_journeys,
     _request_with_retries,
+    get_all_stations,
     get_packages,
     get_station_id,
+    get_stations,
     search_bus,
 )
 from alsa.exceptions import (
@@ -329,6 +331,44 @@ def test_station_id_desconocida_es_error(fake_alsa):
     fake_alsa(GetOriginsResourceCommand=_stations("Madrid"))
     with pytest.raises(AlsaStationError):
         get_station_id("Atlantis")
+
+
+def test_stations_filtra_ignorando_acentos(fake_alsa):
+    fake_alsa(GetOriginsResourceCommand=_stations("Cáceres", "Plasencia", "Cacabelos"))
+    assert [s["name"] for s in get_stations("caceres")] == ["Cáceres"]
+
+
+IMPERVA_PAGE = "<html>Request unsuccessful. Incapsula incident ID: 123</html>"
+
+
+@pytest.mark.parametrize("lookup", [lambda: get_stations("oviedo"), get_all_stations, lambda: get_station_id("Oviedo")])
+def test_bloqueo_al_buscar_paradas_es_un_bloqueo_no_una_lista_vacia(fake_alsa, lookup):
+    fake_alsa(GetOriginsResourceCommand=IMPERVA_PAGE)
+    with pytest.raises(AlsaBlockedError):
+        lookup()
+
+
+@pytest.mark.parametrize("lookup", [lambda: get_stations("oviedo"), get_all_stations, lambda: get_station_id("Oviedo")])
+def test_lista_de_paradas_ilegible_es_error_de_lectura(fake_alsa, lookup):
+    fake_alsa(GetOriginsResourceCommand="<html>mantenimiento</html>")
+    with pytest.raises(AlsaParseError):
+        lookup()
+
+
+def test_timeout_al_buscar_paradas_es_un_timeout_sin_reintento(monkeypatch):
+    calls = []
+
+    class SlowSession:
+        impersonate = ""
+
+        def post(self, *args, **kwargs):
+            calls.append(args)
+            raise Timeout("lento")
+
+    monkeypatch.setattr(core.curl_requests, "Session", SlowSession)
+    with pytest.raises(AlsaTimeoutError):
+        get_station_id("Madrid")
+    assert len(calls) == 1
 
 
 PACKAGE_FARES = {
