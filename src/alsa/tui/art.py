@@ -233,3 +233,74 @@ def scene_text(
                 if ch != "." and 0 <= x < width and 0 <= top + by < height:
                     grid[top + by][x] = ch
     return render(["".join(row) for row in grid], lambda x, y, ch: SCENE_PALETTE.get(ch))
+
+
+# --- seguimiento: tira de la ruta con un autocar pequeño ---------------------------
+
+# Autocar de perfil mirando a la derecha, hacia el destino: 8 píxeles = 4 líneas.
+MINI_BUS = [
+    "..wwwwwwwwwwwwwwww..",
+    ".WWWWWWWWWWWWWWWWWW.",
+    ".RGGgWGGgWGGgWDWGGGW",
+    ".WGGGWGGGWGGGWDWGGGW",
+    ".WWWWWWWWWWWWWDWWWWW",
+    ".BCCCCBBBBBBBBDBBBBY",
+    ".SSKKKSSSSSSSSKKKSSS",
+    "...KHK........KHK...",
+]
+MINI_BUS_WIDTH = len(MINI_BUS[0])
+STRIP_HEIGHT = 10  # píxeles: autocar, postes de parada y carretera
+STRIP_PALETTE = {
+    **PALETTE,
+    "a": "#232b3a",  # asfalto por recorrer
+    "m": "#6f7a8e",  # línea discontinua
+    "r": "#1d6fe0",  # asfalto ya recorrido, azul Alsa
+    "p": "#5b6478",  # poste de parada
+    "o": "#ffb547",  # tu parada de salida y de llegada, ámbar como el letrero
+    "i": "#8b95a7",  # parada intermedia
+}
+
+
+def route_strip(
+    width: int, progress: float | None, stops: list[float] | None = None, frame: int = 0, approaching: bool = False
+) -> Text:
+    """Carretera de tu salida (izquierda) a tu llegada (derecha) con el autocar en `progress`.
+
+    `stops` son las paradas intermedias como fracción del trayecto (0 a 1) y `progress=None`
+    dibuja la carretera sin autocar. Con `approaching`, el autocar aún no ha llegado a tu
+    parada: espera a su izquierda, en un tramo de carretera previo. `frame` anima la línea
+    discontinua.
+    """
+    width = max(width, 2 * MINI_BUS_WIDTH + 4)
+    ground = STRIP_HEIGHT - 2
+    grid = [["." for _ in range(width)] for _ in range(STRIP_HEIGHT)]
+    start = MINI_BUS_WIDTH + 3 if approaching else 0  # x de tu parada de salida
+    span = width - 1 - start
+    if approaching:
+        bus_x: int | None = 0
+    else:
+        bus_x = None if progress is None else round(progress * (width - MINI_BUS_WIDTH))
+    # El tramo recorrido, en azul, llega hasta el morro del autocar.
+    travelled = bus_x + MINI_BUS_WIDTH - 1 if bus_x is not None and progress and not approaching else -1
+    for x in range(width):
+        grid[ground][x] = "r" if x <= travelled else "a"
+        grid[ground + 1][x] = "m" if (x - frame) % 6 < 3 else "a"
+
+    def post(x: int, sign: str) -> None:
+        x = min(width - 1, max(0, x))
+        for y in range(ground - 3, ground):
+            grid[y][x] = "p"
+        grid[ground - 4][x] = sign
+
+    for fraction in stops or []:
+        post(start + round(fraction * span), "i")
+    post(start, "o")
+    post(width - 1, "o")
+
+    if bus_x is not None:
+        top = ground - len(MINI_BUS)  # las ruedas apoyan sobre la carretera
+        for by, row in enumerate(MINI_BUS):
+            for bx, ch in enumerate(row):
+                if ch != "." and 0 <= bus_x + bx < width:
+                    grid[top + by][bus_x + bx] = ch
+    return render(["".join(row) for row in grid], lambda x, y, ch: STRIP_PALETTE.get(ch))

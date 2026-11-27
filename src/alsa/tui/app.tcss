@@ -585,3 +585,99 @@ BuyScreen.-short .dialog {
 BuyScreen.-short #buy-summary {
     padding: 0 1;
 }
+
+/* --- seguimiento ---------------------------------------------------------- */
+
+#tracking-box {
+    width: 88;
+}
+
+#tracking-summary {
+    background: $panel;
+    padding: 1 2;
+    margin-bottom: 1;
+}
+
+#tracking-strip {
+    margin-bottom: 1;
+}
+
+TrackingScreen.-short #tracking-summary {
+    padding: 0 1;
+}
+
+TrackingScreen.-short #tracking-strip {
+    display: none;
+}
+
+#tracking-tabs {
+    margin-bottom: 1;
+}
+
+#route-view {
+    height: auto;
+}
+
+#map-view {
+    display: none;
+    height: 1fr;
+}
+
+#map-sidebar {
+    width: 38;
+    height: 1fr;
+    padding: 0 0 0 1;
+    border-left: solid $panel;
+    scrollbar-size: 1 1;
+}
+
+#map-legend, #map-stops {
+    height: auto;
+}
+
+#map-stops {
+    margin-top: 1;
+}
+
+TrackingScreen.-map #tracking-box {
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    padding: 0 2;
+}
+
+TrackingScreen.-map #route-view,
+TrackingScreen.-map #tracking-summary {
+    display: none;
+}
+
+TrackingScreen.-map #map-view {
+    display: block;
+}
+
+TrackingScreen.-map.-narrow #map-view {
+    layout: vertical;
+}
+
+TrackingScreen.-map.-narrow #map-sidebar {
+    width: 100%;
+    height: 2fr;
+    padding: 0;
+    border-left: none;
+    border-top: solid $panel;
+}
+
+TrackingScreen.-map.-short #tracking-note,
+TrackingScreen.-map.-narrow #tracking-note {
+    display: none;
+}
+
+TrackingScreen.-map.-short #tracking-tabs,
+TrackingScreen.-map.-short .dialog-title {
+    margin-bottom: 0;
+}
+
+TrackingScreen.-map #tracking-note.-error {
+    display: block;
+}
